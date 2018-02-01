@@ -5,7 +5,7 @@ import type PackageResolver from './package-resolver.js';
 import type {Reporter} from './reporters/index.js';
 import type Config from './config.js';
 import type {Install} from './cli/commands/install';
-
+import FileResolver from './resolvers/exotics/file-resolver';
 import path from 'path';
 
 import invariant from 'invariant';
@@ -212,6 +212,12 @@ export default class PackageRequest {
     ref.addOptional(this.optional);
   }
 
+  relativize(pkgLocation: string, target: string) : string {
+    const dir = path.dirname(pkgLocation);
+    const depPath = path.resolve(dir, target);
+    return './' + path.relative(this.config.lockfileFolder, depPath);
+  }
+
   /**
    * TODO description
    */
@@ -262,8 +268,19 @@ export default class PackageRequest {
     const parentNames = [...this.parentNames, name];
     // normal deps
     for (const depName in info.dependencies) {
-      const depPattern = depName + '@' + info.dependencies[depName];
+
+      let depTarget : string = info.dependencies[depName] || '';
+      const isPkgLocal = info._loc && await fs.exists(info._loc);
+      const isTargetFilePath = FileResolver.isVersion(depTarget);
+
+      if(isPkgLocal && isTargetFilePath && info._loc){
+        depTarget = this.relativize(info._loc, depTarget);
+      }
+
+      const depPattern = depName + '@' + depTarget;
+
       deps.push(depPattern);
+
       promises.push(
         this.resolver.find({
           pattern: depPattern,

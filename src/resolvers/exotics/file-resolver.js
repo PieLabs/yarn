@@ -32,6 +32,7 @@ export default class FileResolver extends ExoticResolver {
 
   async resolve(): Promise<Manifest> {
     let loc = this.loc;
+
     if (!path.isAbsolute(loc)) {
       loc = path.resolve(this.config.lockfileFolder, loc);
     }
