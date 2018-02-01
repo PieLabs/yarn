@@ -20,7 +20,10 @@ const buildParentPath = (acc: string[], request: PackageRequest) : string[] => {
     return acc;
   } else {
     const {parentRequest, parentNames} = request;
-    const n = parentNames[parentNames.length -1];
+    const n = parentNames.length > 0 ?  parentNames[parentNames.length -1] : undefined;
+    if(!n){
+      throw new Error('parentRequest is present, but parentNames is empty?');
+    }
     const p = parentRequest.pattern.replace(`${n}@`, '');
     acc.push(p);
     return buildParentPath(acc, parentRequest);
