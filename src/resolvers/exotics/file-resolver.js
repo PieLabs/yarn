@@ -15,6 +15,25 @@ import * as fs from '../../util/fs.js';
 
 export const FILE_PROTOCOL_PREFIX = 'file:';
 
+const buildParentPath = (acc: string[], request: PackageRequest) : string[] => {
+  if(!request.parentRequest){
+    return acc;
+  } else {
+    const {parentRequest, parentNames} = request;
+    const n = parentNames[parentNames.length -1];
+    const p = parentRequest.pattern.replace(`${n}@`, '');
+    acc.push(p);
+    return buildParentPath(acc, parentRequest);
+  }
+}
+
+const resolvePath = (lockfileFolder:string, request: PackageRequest, loc:string) : string => {
+  const parents = buildParentPath([], request);
+  const args = [lockfileFolder].concat(parents).concat([loc]);
+  const out = path.resolve.apply(path, args);
+  return out;
+}
+
 export default class FileResolver extends ExoticResolver {
   constructor(request: PackageRequest, fragment: string) {
     super(request, fragment);
@@ -33,7 +52,11 @@ export default class FileResolver extends ExoticResolver {
   async resolve(): Promise<Manifest> {
     let loc = this.loc;
     if (!path.isAbsolute(loc)) {
-      loc = path.resolve(this.config.lockfileFolder, loc);
+      /**
+       * >> Dont resolve just against the lock file dir.
+       * loc = path.resolve(this.config.lockfileFolder, loc);
+       */
+      loc  = resolvePath(this.config.lockfileFolder, this.request, loc);
     }
 
     if (this.config.linkFileDependencies) {
