@@ -12,15 +12,18 @@ import {MessageError} from '../../errors.js';
 import ExoticResolver from './exotic-resolver.js';
 import * as util from '../../util/misc.js';
 import * as fs from '../../util/fs.js';
+import debug from 'debug';
 
 export const FILE_PROTOCOL_PREFIX = 'file:';
 
 export default class FileResolver extends ExoticResolver {
   constructor(request: PackageRequest, fragment: string) {
     super(request, fragment);
+    this.log = debug(`yarn:file-resolver:${request.pattern}`);
+    this.log('[new]');
     this.loc = util.removePrefix(fragment, FILE_PROTOCOL_PREFIX);
   }
-
+  log: (...any[]) => void;
   loc: string;
 
   static protocol = 'file';
@@ -32,9 +35,13 @@ export default class FileResolver extends ExoticResolver {
 
   async resolve(): Promise<Manifest> {
     let loc = this.loc;
+    this.log('[resolve] loc: ', loc);
     if (!path.isAbsolute(loc)) {
+      this.log('[resolve] resolve loc using lockfileFolder');
       loc = path.resolve(this.config.lockfileFolder, loc);
     }
+
+    this.log('[resolve] loc: ', loc);
 
     if (this.config.linkFileDependencies) {
       const registry: RegistryNames = 'npm';

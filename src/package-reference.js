@@ -7,9 +7,12 @@ import type PackageRequest from './package-request.js';
 import type PackageResolver from './package-resolver.js';
 import type {RegistryNames} from './registries/index.js';
 import {entries} from './util/misc.js';
+import debug from 'debug';
 
 export default class PackageReference {
   constructor(request: PackageRequest, info: Manifest, remote: PackageRemote) {
+    this.log = debug(`yarn:package-reference:${request.pattern}`);
+    this.log('[new]');
     this.resolver = request.resolver;
     this.lockfile = request.lockfile;
     this.requests = [];
@@ -35,6 +38,7 @@ export default class PackageReference {
     this.addRequest(request);
   }
 
+  log: (...any[]) => void;
   requests: Array<PackageRequest>;
   lockfile: Lockfile;
   config: Config;
@@ -56,14 +60,17 @@ export default class PackageReference {
   resolver: PackageResolver;
 
   setFresh(fresh: boolean) {
+    this.log('[setFresh] fresh: ', fresh);
     this.fresh = fresh;
   }
 
   setLocation(loc: string): string {
+    this.log('[setLocation] loc: ', loc);
     return (this.location = loc);
   }
 
   addRequest(request: PackageRequest) {
+    this.log('[addRequest] request: ', request.pattern);
     this.requests.push(request);
 
     this.level = Math.min(this.level, request.parentNames.length);
@@ -77,10 +84,12 @@ export default class PackageReference {
   }
 
   addDependencies(deps: Array<string>) {
+    this.log('[addDependencies] deps: ', deps);
     this.dependencies = this.dependencies.concat(deps);
   }
 
   setPermission(key: string, val: boolean) {
+    this.log('[setPermission] key: ', key, 'val: ', val);
     this.permissions[key] = val;
   }
 
@@ -93,6 +102,7 @@ export default class PackageReference {
   }
 
   addPattern(pattern: string, manifest: Manifest) {
+    this.log('[addPattern] string: ', pattern, 'manifest:', manifest._loc);
     this.resolver.addPattern(pattern, manifest);
 
     this.patterns.push(pattern);

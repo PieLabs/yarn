@@ -14,6 +14,7 @@ import Lockfile from './lockfile';
 import map from './util/map.js';
 import WorkspaceLayout from './workspace-layout.js';
 import ResolutionMap from './resolution-map.js';
+import debug from 'debug';
 
 const invariant = require('invariant');
 const semver = require('semver');
@@ -38,7 +39,11 @@ export default class PackageResolver {
     this.lockfile = lockfile;
     this.config = config;
     this.delayedResolveQueue = [];
+    this.log = debug('yarn:package-resolver');
+
   }
+
+  log: (...any[]) => void;
 
   // whether the dependency graph will be flattened
   flat: boolean;
@@ -99,6 +104,8 @@ export default class PackageResolver {
   }
 
   updateManifest(ref: PackageReference, newPkg: Manifest): Promise<void> {
+    this.log('[updateManifest] ref.patterns:', ref.patterns);
+
     // inherit fields
     const oldPkg = this.patterns[ref.patterns[0]];
     newPkg._reference = ref;
@@ -131,6 +138,7 @@ export default class PackageResolver {
    */
 
   dedupePatterns(patterns: Iterable<string>): Array<string> {
+    this.log('[dedupePatterns] patterns:', patterns);
     const deduped = [];
     const seen = new Set();
 
@@ -152,6 +160,7 @@ export default class PackageResolver {
    */
 
   getTopologicalManifests(seedPatterns: Array<string>): Iterable<Manifest> {
+    this.log('[getTopologicalManifests] seedPatterns:', seedPatterns);
     const pkgs: Set<Manifest> = new Set();
     const skip: Set<Manifest> = new Set();
 
@@ -180,6 +189,7 @@ export default class PackageResolver {
    */
 
   getLevelOrderManifests(seedPatterns: Array<string>): Iterable<Manifest> {
+    this.log('[getLevelOrderManifests] seedPatterns:', seedPatterns);
     const pkgs: Set<Manifest> = new Set();
     const skip: Set<Manifest> = new Set();
 
@@ -215,6 +225,7 @@ export default class PackageResolver {
    */
 
   getAllDependencyNamesByLevelOrder(seedPatterns: Array<string>): Iterable<string> {
+    this.log('[getAllDependencyNamesByLevelOrder] seedPatterns:', seedPatterns);
     const names = new Set();
     for (const {name} of this.getLevelOrderManifests(seedPatterns)) {
       names.add(name);
@@ -227,6 +238,7 @@ export default class PackageResolver {
    */
 
   getAllInfoForPackageName(name: string): Array<Manifest> {
+    this.log('[getAllInfoForPackageName] name:', name);
     const patterns = this.patternsByPackage[name] || [];
     return this.getAllInfoForPatterns(patterns);
   }
@@ -236,6 +248,7 @@ export default class PackageResolver {
    */
 
   getAllInfoForPatterns(patterns: string[]): Array<Manifest> {
+    this.log('[getAllInfoForPatterns] patterns:', patterns);
     const infos = [];
     const seen = new Set();
 
@@ -277,6 +290,7 @@ export default class PackageResolver {
    * replace pattern in resolver, e.g. `name` is replaced with `name@^1.0.1`
    */
   replacePattern(pattern: string, newPattern: string) {
+    this.log('[replacePattern] pattern:', pattern, 'newPattern: ', newPattern);
     const pkg = this.getResolvedPattern(pattern);
     invariant(pkg, `missing package ${pattern}`);
     const ref = pkg._reference;
@@ -346,6 +360,7 @@ export default class PackageResolver {
    */
 
   addPattern(pattern: string, info: Manifest) {
+    this.log('[addPattern] pattern:', pattern);
     this.patterns[pattern] = info;
 
     const byName = (this.patternsByPackage[info.name] = this.patternsByPackage[info.name] || []);
@@ -357,6 +372,7 @@ export default class PackageResolver {
    */
 
   removePattern(pattern: string) {
+    this.log('[removePattern] pattern:', pattern);
     const pkg = this.patterns[pattern];
     if (!pkg) {
       return;
@@ -376,6 +392,7 @@ export default class PackageResolver {
    */
 
   getResolvedPattern(pattern: string): ?Manifest {
+    this.log('[getResolvedPattern] pattern:', pattern);
     return this.patterns[pattern];
   }
 
@@ -384,6 +401,7 @@ export default class PackageResolver {
    */
 
   getStrictResolvedPattern(pattern: string): Manifest {
+    this.log('[getStrictResolvedPattern] pattern:', pattern);
     const manifest = this.getResolvedPattern(pattern);
     invariant(manifest, 'expected manifest');
     return manifest;
@@ -394,6 +412,7 @@ export default class PackageResolver {
    */
 
   getExactVersionMatch(name: string, version: string, manifest: ?Manifest): ?Manifest {
+    this.log('[getExactVersionMatch] name:', name, 'version: ', version);
     const patterns = this.patternsByPackage[name];
     if (!patterns) {
       return null;
@@ -418,6 +437,7 @@ export default class PackageResolver {
    */
 
   getHighestRangeVersionMatch(name: string, range: string, manifest: ?Manifest): ?Manifest {
+    this.log('[getHighestRangeVersionMatch] name:', name, 'range: ', range);
     const patterns = this.patternsByPackage[name];
 
     if (!patterns) {
@@ -449,6 +469,7 @@ export default class PackageResolver {
    */
 
   exoticRangeMatch(resolvedPkgs: Array<Manifest>, manifest: Manifest): ?Manifest {
+    this.log('[exoticRangeMatch] manifest:', manifest._loc);
     const remote = manifest._remote;
     if (!(remote && remote.reference && remote.type === 'copy')) {
       return null;
@@ -483,12 +504,17 @@ export default class PackageResolver {
    */
 
   async find(initialReq: DependencyRequestPattern): Promise<void> {
+
+    this.log('[find] initialReq:', initialReq.pattern);
+
     const req = this.resolveToResolution(initialReq);
 
     // we've already resolved it with a resolution
     if (!req) {
       return;
     }
+
+    this.log('[find] req.pattern: ', req.pattern);
 
     const request = new PackageRequest(req, this);
     const fetchKey = `${req.registry}:${req.pattern}:${String(req.optional)}`;

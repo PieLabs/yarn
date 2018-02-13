@@ -22,6 +22,8 @@ import WorkspaceResolver from './resolvers/contextual/workspace-resolver.js';
 import {getExoticResolver} from './resolvers/index.js';
 import * as fs from './util/fs.js';
 import {normalizePattern} from './util/normalize-pattern.js';
+import debug from 'debug';
+import {buildPattern} from './pattern-builder';
 
 type ResolverRegistryNames = $Keys<typeof registryResolvers>;
 
@@ -29,6 +31,9 @@ const micromatch = require('micromatch');
 
 export default class PackageRequest {
   constructor(req: DependencyRequestPattern, resolver: PackageResolver) {
+
+    this.log = debug(`yarn:package-request:${req.pattern}`);
+    this.log('[new]');
     this.parentRequest = req.parentRequest;
     this.parentNames = req.parentNames || [];
     this.lockfile = resolver.lockfile;
@@ -45,6 +50,7 @@ export default class PackageRequest {
     this.resolver.usedRegistries.add(this.registry);
   }
 
+  log: (...args: any[]) => void;
   parentRequest: ?PackageRequest;
   parentNames: Array<string>;
   lockfile: Lockfile;
@@ -57,6 +63,7 @@ export default class PackageRequest {
   foundInfo: ?Manifest;
 
   getLocked(remoteType: string): ?Object {
+    this.log('[getLocked]');
     // always prioritise root lockfile
     const shrunk = this.lockfile.getLocked(this.pattern);
 
@@ -91,6 +98,7 @@ export default class PackageRequest {
    */
 
   async findVersionOnRegistry(pattern: string): Promise<Manifest> {
+    this.log('[findVersionOnRegistry] pattern: ', pattern);
     const {range, name} = await this.normalize(pattern);
 
     const exoticResolver = getExoticResolver(range);
@@ -130,6 +138,7 @@ export default class PackageRequest {
    */
 
   getRegistryResolver(): Function {
+    this.log('[getRegistryResolver]');
     const Resolver = registryResolvers[this.registry];
     if (Resolver) {
       return Resolver;
@@ -139,6 +148,7 @@ export default class PackageRequest {
   }
 
   async normalizeRange(pattern: string): Promise<string> {
+    this.log('[normalizeRange], pattern: ', pattern);
     if (pattern.indexOf(':') > -1 || pattern.indexOf('@') > -1 || getExoticResolver(pattern)) {
       return pattern;
     }
@@ -158,6 +168,7 @@ export default class PackageRequest {
   }
 
   async normalize(pattern: string): any {
+    this.log('[normalize] pattern: ', pattern);
     const {name, range, hasVersion} = normalizePattern(pattern);
     const newRange = await this.normalizeRange(range);
     return {name, range: newRange, hasVersion};
@@ -168,6 +179,7 @@ export default class PackageRequest {
    */
 
   findExoticVersionInfo(ExoticResolver: Function, range: string): Promise<Manifest> {
+    this.log('[findExoticVersionInfo] range: ', range);
     const resolver = new ExoticResolver(this, range);
     return resolver.resolve();
   }
@@ -178,6 +190,7 @@ export default class PackageRequest {
    */
 
   findVersionInfo(): Promise<Manifest> {
+    this.log('[findVersionOnRegistry]');
     const exoticResolver = getExoticResolver(this.pattern);
     if (exoticResolver) {
       return this.findExoticVersionInfo(exoticResolver, this.pattern);
@@ -198,6 +211,7 @@ export default class PackageRequest {
    * is found.
    */
   resolveToExistingVersion(info: Manifest) {
+    this.log('[resolveToExistingVersion]');
     // get final resolved version
     const {range, name} = normalizePattern(this.pattern);
     const solvedRange = semver.validRange(range) ? info.version : range;
@@ -216,6 +230,7 @@ export default class PackageRequest {
    * TODO description
    */
   async find({fresh, frozen}: {fresh: boolean, frozen?: boolean}): Promise<void> {
+    this.log('[find], fresh: ', fresh, 'frozen: ', frozen);
     // find version info for this package pattern
     const info: Manifest = await this.findVersionInfo();
 
@@ -266,7 +281,14 @@ export default class PackageRequest {
     const parentNames = [...this.parentNames, name];
     // normal deps
     for (const depName in info.dependencies) {
-      const depPattern = depName + '@' + info.dependencies[depName];
+      // const depPattern = depName + '@' + info.dependencies[depName];
+      const depPattern = await buildPattern(
+        depName,
+        info.dependencies[depName],
+        info._loc,
+        this.config);
+
+       //depName + '@' + info.dependencies[depName];
       deps.push(depPattern);
       promises.push(
         this.resolver.find({
@@ -328,6 +350,7 @@ export default class PackageRequest {
    */
 
   static validateVersionInfo(info: Manifest, reporter: Reporter) {
+    debug('yarn:package-request')('[validateVersionInfo] info: ', info._loc);
     // human readable name to use in errors
     const human = `${info.name}@${info.version}`;
 

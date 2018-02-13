@@ -20,6 +20,9 @@ import ExoticLink from './exotics/link-resolver.js';
 import ExoticGitLab from './exotics/gitlab-resolver.js';
 import ExoticGist from './exotics/gist-resolver.js';
 import ExoticBitbucket from './exotics/bitbucket-resolver.js';
+import debug from 'debug';
+
+const log = debug('yarn:resolvers');
 
 const exotics: Set<Class<$Subtype<BaseResolver>>> = new Set([
   ExoticGit,
@@ -33,6 +36,7 @@ const exotics: Set<Class<$Subtype<BaseResolver>>> = new Set([
 ]);
 
 export function getExoticResolver(pattern: string): ?Class<$Subtype<BaseResolver>> {
+  log('[getExoticResolver]: pattern:', pattern);
   for (const Resolver of exotics) {
     if (Resolver.isVersion(pattern)) {
       return Resolver;

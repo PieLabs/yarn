@@ -29,6 +29,7 @@ import {version as YARN_VERSION, getInstallationMethod} from '../../util/yarn-ve
 import WorkspaceLayout from '../../workspace-layout.js';
 import ResolutionMap from '../../resolution-map.js';
 import guessName from '../../util/guess-name';
+import debug from 'debug';
 
 const emoji = require('node-emoji');
 const invariant = require('invariant');
@@ -181,6 +182,7 @@ function normalizeFlags(config: Config, rawFlags: Object): Flags {
 
 export class Install {
   constructor(flags: Object, config: Config, reporter: Reporter, lockfile: Lockfile) {
+    this.log = debug('yarn:install');
     this.rootManifestRegistries = [];
     this.rootPatternsToOrigin = map();
     this.lockfile = lockfile;
@@ -194,7 +196,7 @@ export class Install {
     this.linker = new PackageLinker(config, this.resolver);
     this.scripts = new PackageInstallScripts(config, this.resolver, this.flags.force);
   }
-
+  log: (...any[])=> void;
   flags: Flags;
   rootManifestRegistries: Array<RegistryNames>;
   registries: Array<RegistryNames>;
@@ -536,7 +538,9 @@ export class Install {
       callThroughHook('resolveStep', async () => {
         this.reporter.step(curr, total, this.reporter.lang('resolvingPackages'), emoji.get('mag'));
         this.resolutionMap.setTopLevelPatterns(rawPatterns);
-        await this.resolver.init(this.prepareRequests(depRequests), {
+        const prepped = this.prepareRequests(depRequests);
+        this.log('[init] prepped: ', prepped, 'rawPatterns: ', rawPatterns, 'depRequests: ', depRequests);
+        await this.resolver.init(prepped, {
           isFlat: this.flags.flat,
           isFrozen: this.flags.frozenLockfile,
           workspaceLayout,
